@@ -117,8 +117,11 @@ def make_gear():
     # 检查四个keywordlist里的keyword以及special_mod，是否在定义的前后缀总集中，防止keyword定义错误导致无限洗
     pre_and_suf_str = "\n".join(pre_list) + "\n".join(suf_list)
     # 合并所有字典的键
-    first_strings_list = [item[0] for mod_list in [and_mod, count_mod, not_mod, magic_and_mod, magic_count_mod, magic_not_mod] for item in mod_list]
-    for i in first_strings_list:
+    combined_keys = list(and_mod.keys()) + list(count_mod.keys()) + list(not_mod.keys()) + list(magic_and_mod.keys())\
+                    + list(magic_count_mod.keys()) + list(magic_not_mod.keys())
+    # 提取所有的键
+    unique_keys = list(set(combined_keys))
+    for i in unique_keys:
         if len(re.findall(i, pre_and_suf_str, re.S)) == 0:
             print('词缀' + i + '不在总表里，请修改')
             sys.exit()
