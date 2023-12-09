@@ -124,12 +124,11 @@ def make_gear():
     pre_list = eval(cp.get('PreandSuf', 'pre_list'))
     suf_list = eval(cp.get('PreandSuf', 'suf_list'))
 
-    # 检查四个keywordlist里的keyword以及special_mod，是否在定义的前后缀总集中，防止keyword定义错误导致无限洗
+    # 检查设置的mod和magic_mod条件是否在定义的前后缀总集中，防止定义错误导致无限洗
     pre_and_suf_str_list = pre_list + suf_list
     # 合并所有字典的键
     combined_keys = list(and_mod.keys()) + list(count_mod.keys()) + list(not_mod.keys()) + list(magic_and_mod.keys())\
                     + list(magic_count_mod.keys()) + list(magic_not_mod.keys())
-    # 提取所有的键
     unique_keys = list(set(combined_keys))
     check_ret = False
     for i in unique_keys:
@@ -263,7 +262,7 @@ def make_gear():
                 # 把鼠标放到物品上，对物品稀有度和词缀进行判断
                 pyautogui.moveTo(int(item_point.split(",", 1)[0]), int(item_point.split(",", 1)[1]), duration=0.1)
                 pyperclip.copy('')
-                pyautogui.hotkey('ctrl', 'c')
+                pyautogui.hotkey('ctrl', 'alt', 'c')
                 item_status = pyperclip.paste()
                 # 寻找词缀，并进行前后缀组织，找到词缀后对词缀整体段落进行判断，全部词缀是否都被识别出来了，如果没有，报错停止,mod是游戏里带数值的实际属性，pre，suf是列表里的正则表达式形式
                 re_prefix_list = []
@@ -271,7 +270,7 @@ def make_gear():
                 mod_prefix_list = []
                 mod_suffix_list = []
                 for pre in pre_list:
-                    if re.search(pre, item_status, re.S):
+                    if re.search(pre, item_status):
                         mod = re.search(pre, item_status, re.S).group(0)
                         re_prefix_list.append(pre)
                         mod_prefix_list.append(mod)
@@ -290,9 +289,8 @@ def make_gear():
                 # 统计找出了多少个词缀，是否和物品上的真实词缀条数相同，防止ini中的正则匹配词条写错
                 allfix_list = re_prefix_list + re_suffix_list
                 if len(allfix_list) != 0:
-                    real_mod_list = re.search('-----.*-----(.*?{}.*?)(-----|$)'.format(allfix_list[0]), item_status,
-                                              re.S).group(1).strip().split('\r\n', -1)
-                    if len(allfix_list) != len(real_mod_list):
+                    real_mod_list = re.search('-----.*-----(.*?{}.*?)(-----|$)'.format(allfix_list[0]), item_status, re.S).group(1).strip().split('等阶', -1)
+                    if len(allfix_list) != len(real_mod_list)-1:
                         print('找到的词缀' + str(allfix_list) + '\n' + '真实的词缀' + str(
                             real_mod_list) + '\n' + '上述两个列表的词缀不相等，词缀没找全，系统关闭')
                         sys.exit()
