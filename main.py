@@ -1,13 +1,23 @@
-# coding:utf-8
 import pyautogui
 import time
 import os
 from pynput.keyboard import Controller, Key, Listener, GlobalHotKeys
+import pynput.keyboard as keyboard
 import pyperclip
 import configparser
 import re
 import sys
 import random
+import threading
+
+exit_flag = False
+cfg_ini_files = ['召唤物中型星团.ini', '混沌持续弓.ini']
+cfg_ini_file = cfg_ini_files[0]
+def on_press(key):
+    global exit_flag
+    if key == keyboard.Key.tab:
+         exit_flag = True
+         print('Exiting')
 
 # 获取当前屏幕分辨率
 def get_screenpoint():
@@ -21,11 +31,11 @@ def get_screenpoint():
 def get_item_location():
     cp = configparser.ConfigParser()
     dirs = os.listdir('正在使用的config')
-    cp.read('正在使用的config' + '\\' + dirs[0], encoding="utf-8-sig")
+    cp.read('正在使用的config' + '\\' + cfg_ini_file, encoding="utf-8-sig")
     x, y = pyautogui.position()  # 获取当前鼠标的位置
     now_time = str(time.strftime('%Y-%m-%d_%H_%M_%S', time.localtime(time.time())))
     cp.set("item", now_time, str(x) + ',' + str(y))
-    cp.write(open('正在使用的config' + '\\' + dirs[0], "w", encoding='utf-8-sig'))
+    cp.write(open('正在使用的config' + '\\' + cfg_ini_file, "w", encoding='utf-8-sig'))
 
 def exit_sys():
     sys.exit()
@@ -97,7 +107,7 @@ def make_gear():
     # 初始化INI
     cp = configparser.ConfigParser()
     dirs = os.listdir('正在使用的config')
-    cp.read('正在使用的config' + '\\' + dirs[0], encoding="utf-8-sig")
+    cp.read('正在使用的config' + '\\' + cfg_ini_file, encoding="utf-8-sig")
     # 定义需要的Mod，
     and_mod = eval(cp.get('Mod', 'and_mod'))
     count_mod = eval(cp.get('Mod', 'count_mod'))
@@ -115,16 +125,22 @@ def make_gear():
     suf_list = eval(cp.get('PreandSuf', 'suf_list'))
 
     # 检查四个keywordlist里的keyword以及special_mod，是否在定义的前后缀总集中，防止keyword定义错误导致无限洗
-    pre_and_suf_str = "\n".join(pre_list) + "\n".join(suf_list)
+    pre_and_suf_str_list = pre_list + suf_list
     # 合并所有字典的键
     combined_keys = list(and_mod.keys()) + list(count_mod.keys()) + list(not_mod.keys()) + list(magic_and_mod.keys())\
                     + list(magic_count_mod.keys()) + list(magic_not_mod.keys())
     # 提取所有的键
     unique_keys = list(set(combined_keys))
+    check_ret = False
     for i in unique_keys:
-        if len(re.findall(i, pre_and_suf_str, re.S)) == 0:
-            print('词缀' + i + '不在总表里，请修改')
+        for j in pre_and_suf_str_list:
+            if len(re.findall(i, j, re.S)) != 0 or len(re.findall(j, i, re.S)) != 0:
+                check_ret = True
+                break
+        if check_ret == False:
+            print('词缀' + i + ' 不在总表里，请修改')
             sys.exit()
+        check_ret = False
 
     # 定义选择的做装模式
     make_model = eval(cp.get('make_model', 'model'))
@@ -134,7 +150,7 @@ def make_gear():
     if All_point > 3:
         print('总分大于3，无法制作')
         sys.exit()
-    elif All_point >= 3 and make_model in [1, 2]:
+    elif All_point == 3 and make_model in [1, 2]:
         print("你要求的词缀>=3，不可能在改造、改造增幅模式下成功")
         sys.exit()
 
@@ -228,13 +244,17 @@ def make_gear():
     reg_chaos = float(cp2.get("Price", "regal orb"))  # 富豪
     chaos_chaos = 1  # 混沌
 
-    # 找到所有的item，，进行for循环
+    # 找到所有的item，进行for循环
     item_list = cp.options("item")
     for item in item_list:
         item_point = cp.get('item', item)
         # 这里应该做个死循环
         while True:
             try:
+                if exit_flag:
+                    print('程序已退出')
+                    break
+
                 # 先看通货剩余量，如果没有通货了直接跳出
                 # print(currency_number)
                 if 0 in currency_number.values():
@@ -270,9 +290,8 @@ def make_gear():
                 # 统计找出了多少个词缀，是否和物品上的真实词缀条数相同，防止ini中的正则匹配词条写错
                 allfix_list = re_prefix_list + re_suffix_list
                 if len(allfix_list) != 0:
-                    real_mod_list = re.search('-----.*-----(.*?{}.*?)-----'.format(allfix_list[0]), item_status,
+                    real_mod_list = re.search('-----.*-----(.*?{}.*?)(-----|$)'.format(allfix_list[0]), item_status,
                                               re.S).group(1).strip().split('\r\n', -1)
-                    # print(real_mod_list)
                     if len(allfix_list) != len(real_mod_list):
                         print('找到的词缀' + str(allfix_list) + '\n' + '真实的词缀' + str(
                             real_mod_list) + '\n' + '上述两个列表的词缀不相等，词缀没找全，系统关闭')
@@ -285,7 +304,7 @@ def make_gear():
                 get_point = 0
                 count_timecheck = 0
                 # 拼接物品上的词缀成为一个字符串
-                pre_and_suf_str = " ".join(re_prefix_list) + " ".join(re_suffix_list)
+                pre_and_suf_str = " ".join(mod_prefix_list) + " ".join(mod_suffix_list)
                 # 判断每一个and_mod的属性，如果在字符串里，则加分
                 for i in and_mod.keys():
                     if re.search(i, pre_and_suf_str) is not None:
@@ -300,8 +319,6 @@ def make_gear():
                 # 判断魔法得分，得分是关键词对前后缀拼接的字符串进行匹配，如果匹配到了则加分，magic_countmod 的分数最多不能超过magic_count_times
                 magic_get_point = 0
                 magic_count_timecheck = 0
-                # 拼接物品上的词缀成为一个字符串
-                pre_and_suf_str = " ".join(re_prefix_list) + " ".join(re_suffix_list)
                 # 判断每一个and_mod的属性，如果在字符串里，则加分
                 for i in magic_and_mod.keys():
                     if re.search(i, pre_and_suf_str) is not None:
@@ -521,61 +538,16 @@ def make_gear():
                 # 如果稀有度是金色
                 if Item_Rarity == '稀有' or Item_Rarity == 'Rare':
                     # print('物品等级是稀有')
-
                     # 判断not词缀是否在里面,如果在词缀里则使用改造
                     for i in not_mod:
                         if re.search(i, pre_and_suf_str) is not None:
-                            # 使用改造石
+                            # 使用重铸
                             use_scouring(scouring_point, item_point)
 
-                    # 如果前缀为1，后缀为2
-                    if len(re_prefix_list) == 1 and len(re_suffix_list) == 2:
-                        # 得分为0
-                        if get_point == 0:
-                            # 上重铸
-                            use_scouring(scouring_point, item_point)
-                        elif get_point == 1:
-                            if All_point <= get_point:
-                                # 跳出循环
-                                break
-                            elif All_point > get_point:
-                                # 上重铸
-                                use_scouring(scouring_point, item_point)
-                        elif get_point == 2:
-                            if All_point <= get_point:
-                                # 跳出循环
-                                break
-                            elif All_point > get_point:
-                                # 上重铸
-                                use_scouring(scouring_point, item_point)
-                        elif get_point == 3:
-                            break
-                    elif len(re_prefix_list) == 2 and len(re_suffix_list) == 1:
-                        # 得分为0
-                        if get_point == 0:
-                            # 上重铸
-                            use_scouring(scouring_point, item_point)
-                        elif get_point == 1:
-                            if All_point <= get_point:
-                                # 跳出循环
-                                break
-                            elif All_point > get_point:
-                                # 上重铸
-                                use_scouring(scouring_point, item_point)
-                        elif get_point == 2:
-                            if All_point <= get_point:
-                                # 跳出循环
-                                break
-                            elif All_point > get_point:
-                                # 上重铸
-                                use_scouring(scouring_point, item_point)
-                        elif get_point == 3:
-                            break
-                    else:
-                        if All_point > get_point:
-                            use_scouring(scouring_point, item_point)
-                        elif All_point <= get_point:
-                            break
+                    if All_point > get_point:
+                        use_scouring(scouring_point, item_point)
+                    elif All_point <= get_point:
+                        break
 
             except Exception as e:
                 print('错误' + str(e))
@@ -608,10 +580,13 @@ def make_gear():
 
 if __name__ == '__main__':
     # 直接绑定快捷键
-    with GlobalHotKeys({'<alt>+1': get_screenpoint,
-                        '<alt>+2': get_item_location,
-                        '<alt>+3': make_gear,
-                        '<alt>+q': exit_sys
-                        }
-                       ) as h:
-        h.join()
+    with keyboard.Listener(on_press=on_press) as listener:
+        thread = threading.current_thread()
+        with GlobalHotKeys({'<alt>+1': get_screenpoint,
+                            '<alt>+2': get_item_location,
+                            '<alt>+3': make_gear,
+                            '<alt>+q': exit_sys
+                            }
+                           ) as h:
+            listener.join()
+            h.join()
